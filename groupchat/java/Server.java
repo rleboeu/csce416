@@ -2,27 +2,40 @@ import java.io.*;
 import java.net.*;
 import java.util.ArrayList;
 
+/**
+ * Server class for the group chat
+ * 
+ * @author Ryan LeBoeuf
+ * 
+ * Can be run with terminal command: java Server <port>
+ */
 public class Server {
 
+    // class variables
     private static boolean running;
     private static ArrayList<Socket> connectedClients = new ArrayList<>();
+    private static final int MAX_CLIENT_CONNECTIONS = 10;
 
-    private static void waitForInput() {
+    /**
+     * Continuously waits for System.in input and then broadcasts that input to clients
+     */
+    private static void waitForSystemInput() {
         try {
+            // read input from system
 			BufferedReader fromUserReader = new BufferedReader(
 				new InputStreamReader(System.in)
 			);
 
 			while(true) {
-				String line = fromUserReader.readLine();
+				String line = fromUserReader.readLine().trim(); // no trailing or leading whitespace
 	
-				// If we get null, it means user is done
+				// If we get null, it means system is done
 				if (line == null) {
 					System.out.println("Closing connection");
 					break;
 				}
 	
-				// Send the line to the client
+				// Send the line to the clients
 				broadcast(null, "Server: " + line);
 			}
 
@@ -33,23 +46,33 @@ public class Server {
 		}
     }
 
+    /**
+     * Broadcast message received from source socket to all connected clients
+     * @param source Socket that the message originates from. Is null iff the source is the Server.
+     * @param message String to broadcast to all client.
+     */
     private static void broadcast(Socket source, String message) {
-        boolean shouldCompare = (source != null);
 
+        // for each connected client
         for (Socket client : connectedClients) {
+            // if the client is not connected anymore, remove them from the clients list and close the socket
             if (client.isConnected() == false) {
                 connectedClients.remove(client);
+
                 try {
                     client.close();
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
             } else {
+
+                // client is connected, broadcast to the client iff client != source
                 try {
-                    if (shouldCompare && client == source) {
+                    if (source != null && client == source) {
                         continue;
                     }
 
+                    // send message
                     PrintWriter toClientWriter = new PrintWriter(client.getOutputStream(), true);
                     toClientWriter.println(message);
                 } catch (IOException e) {
@@ -59,38 +82,24 @@ public class Server {
         }
     }
 
-    // private static void broadcast(String message) {
-    //     for (Socket client : connectedClients) {
-    //         if (client.isConnected() == false) {
-    //             connectedClients.remove(client);
-    //             try {
-    //                 client.close();
-    //             } catch (IOException e) {
-    //                 e.printStackTrace();
-    //             }
-    //         } else {
-    //             try {
-    //                 PrintWriter toClientWriter = new PrintWriter(client.getOutputStream(), true);
-    //                 toClientWriter.println(message);
-    //             } catch (IOException e) {
-    //                 e.printStackTrace();
-    //             }
-    //         }
-    //     }
-    // }
-
-    private static void waitForClient(Socket onSocket) {
+    /**
+     * Continuously wait for input from a client, then print that message to the server and broadcast to other clients
+     * @param client Socket that the client is connected via
+     */
+    private static void waitForClient(Socket client) {
         try {
+            // read from client
             BufferedReader fromClientReader = new BufferedReader(
-                new InputStreamReader(onSocket.getInputStream())
+                new InputStreamReader(client.getInputStream())
             );
 
             while (true) {
                 String clientLine;
 
+                // if the client has something to say, broadcast message
                 if ((clientLine = fromClientReader.readLine()) != null) {
                     System.out.println(clientLine);
-                    broadcast(onSocket, clientLine);
+                    broadcast(client, clientLine);
                 }
             }
         } catch (Exception e) {
@@ -118,20 +127,19 @@ public class Server {
             
             System.out.println("Started Server on port " + serverPort);
 
-            Thread serverInputThread = new Thread(new Runnable() {
-                @Override
-                public void run() {
-                    waitForInput();
-                }
-            });
+            // wait for the system input on a separate thread
+            new Thread(() -> {
+                waitForSystemInput();
+            }).start();
 
-            serverInputThread.start();
+			// new connections
+			while (running && connectedClients.size() <= MAX_CLIENT_CONNECTIONS) {
 
-			// Keep serving the client
-			while (running) {
+                // accept the connection and add to client list
                 Socket clientSock = serverSock.accept();
                 connectedClients.add(clientSock);
 
+                // notify server of a new connection
                 System.out.println("Connected to a client at ('" +
                     ((InetSocketAddress) clientSock.getRemoteSocketAddress()).getAddress().getHostAddress()
                     + "', '" +
@@ -139,20 +147,17 @@ public class Server {
                     + "')"
                 );
 
-                Thread clientInputThread = new Thread(new Runnable() {
-                    @Override
-                    public void run() {
-                        waitForClient(clientSock);
-                    }
-                });
+                // wait for the client input on a new thread
+                new Thread(() -> {
+                    waitForClient(clientSock);
+                }).start();
 
-                clientInputThread.start();
             }
 
             serverSock.close();
 		} catch(Exception e) {
-			// Print the exception message
-			System.out.println(e);
+			e.printStackTrace();
+            running = false;
 		}
     }
 }
