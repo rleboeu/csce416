@@ -1,4 +1,4 @@
 compile:
-	javac Client.java Server.java
+	javac GroupChatClient.java GroupChatServer.java
 clean:
 	rm *.class

@@ -9,7 +9,7 @@ import java.util.ArrayList;
  * 
  * Can be run with terminal command: java Server <port>
  */
-public class Server {
+public class GroupChatServer {
 
     // class variables
     private static boolean running;

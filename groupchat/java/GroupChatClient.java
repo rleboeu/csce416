@@ -8,7 +8,7 @@ import java.net.*;
  * 
  * @author Ryan LeBoeuf
  */
-public class Client {
+public class GroupChatClient {
 
 	// class variables
     private static boolean running;
