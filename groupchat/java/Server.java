@@ -23,7 +23,7 @@ public class Server {
 				}
 	
 				// Send the line to the client
-				broadcast("Server: " + line);
+				broadcast(null, "Server: " + line);
 			}
 
 			running = false;
@@ -33,7 +33,9 @@ public class Server {
 		}
     }
 
-    private static void broadcast(String message) {
+    private static void broadcast(Socket source, String message) {
+        boolean shouldCompare = (source != null);
+
         for (Socket client : connectedClients) {
             if (client.isConnected() == false) {
                 connectedClients.remove(client);
@@ -44,6 +46,10 @@ public class Server {
                 }
             } else {
                 try {
+                    if (shouldCompare && client == source) {
+                        continue;
+                    }
+
                     PrintWriter toClientWriter = new PrintWriter(client.getOutputStream(), true);
                     toClientWriter.println(message);
                 } catch (IOException e) {
@@ -52,6 +58,26 @@ public class Server {
             }
         }
     }
+
+    // private static void broadcast(String message) {
+    //     for (Socket client : connectedClients) {
+    //         if (client.isConnected() == false) {
+    //             connectedClients.remove(client);
+    //             try {
+    //                 client.close();
+    //             } catch (IOException e) {
+    //                 e.printStackTrace();
+    //             }
+    //         } else {
+    //             try {
+    //                 PrintWriter toClientWriter = new PrintWriter(client.getOutputStream(), true);
+    //                 toClientWriter.println(message);
+    //             } catch (IOException e) {
+    //                 e.printStackTrace();
+    //             }
+    //         }
+    //     }
+    // }
 
     private static void waitForClient(Socket onSocket) {
         try {
@@ -64,7 +90,7 @@ public class Server {
 
                 if ((clientLine = fromClientReader.readLine()) != null) {
                     System.out.println(clientLine);
-                    broadcast(clientLine);
+                    broadcast(onSocket, clientLine);
                 }
             }
         } catch (Exception e) {
